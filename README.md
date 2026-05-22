@@ -1,0 +1,2 @@
+# belajarmandiri
+berisi latihan aws
