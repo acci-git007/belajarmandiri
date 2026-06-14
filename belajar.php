@@ -1,11 +1,11 @@
 <?php
 
-require __DIR__ . '/vendor/autoload.php';
+require 'vendor/autoload.php';
 
 use Aws\S3\S3Client;
 
 /* ==========================
-   KONFIGURASI RDS
+   KONEKSI RDS
 ========================== */
 
 $host = "dbsiswa.c83ya4kmsi7u.us-east-1.rds.amazonaws.com";
@@ -16,19 +16,19 @@ $db   = "dbsiswa";
 $conn = mysqli_connect($host, $user, $pass, $db);
 
 if (!$conn) {
-    die("Koneksi RDS gagal: " . mysqli_connect_error());
+    die("Koneksi database gagal : " . mysqli_connect_error());
 }
 
 /* ==========================
-   KONFIGURASI S3
+   KONEKSI S3
 ========================== */
+
+$bucket = "foto-siswa-bucket";
 
 $s3 = new S3Client([
     'version' => 'latest',
-    'region'  => 'us-east-1' // 
+    'region'  => 'us-east-1'
 ]);
-
-$bucket = "foto-siswa-bucket";
 
 /* ==========================
    SIMPAN DATA
@@ -41,7 +41,7 @@ if (isset($_POST['simpan'])) {
     $kelas  = mysqli_real_escape_string($conn, $_POST['kelas']);
     $alamat = mysqli_real_escape_string($conn, $_POST['alamat']);
 
-    $fotoUrl = "";
+    $fotoUrl = '';
 
     if (!empty($_FILES['foto']['name'])) {
 
@@ -59,16 +59,18 @@ if (isset($_POST['simpan'])) {
 
         } catch (Exception $e) {
 
-            die("Upload S3 gagal: " . $e->getMessage());
+            die("Upload S3 gagal : " . $e->getMessage());
         }
     }
 
-    $sql = "INSERT INTO siswa(nis,nama,kelas,alamat,foto)
-            VALUES('$nis','$nama','$kelas','$alamat','$fotoUrl')";
+    $sql = "INSERT INTO siswa
+            (nis,nama,kelas,alamat,foto)
+            VALUES
+            ('$nis','$nama','$kelas','$alamat','$fotoUrl')";
 
     mysqli_query($conn, $sql);
 
-    header("Location: index.php");
+    header("Location:index.php");
     exit;
 }
 
@@ -78,14 +80,14 @@ if (isset($_POST['simpan'])) {
 <html>
 <head>
 <meta charset="utf-8">
-<title>Aplikasi Data Siswa AWS</title>
+<title>Data Siswa AWS</title>
 
 <style>
 
 body{
     font-family: Arial, sans-serif;
-    margin:40px;
-    background:#f4f6f9;
+    background:#f4f4f4;
+    margin:30px;
 }
 
 .container{
@@ -94,23 +96,17 @@ body{
     border-radius:10px;
 }
 
-h2{
-    color:#333;
-}
-
-input, textarea{
+input,textarea{
     width:100%;
     padding:10px;
-    margin-top:5px;
-    margin-bottom:15px;
+    margin-bottom:10px;
 }
 
 button{
-    background:#007bff;
+    padding:10px 20px;
+    background:#0d6efd;
     color:white;
     border:none;
-    padding:10px 20px;
-    cursor:pointer;
 }
 
 table{
@@ -119,13 +115,14 @@ table{
     margin-top:20px;
 }
 
-table th, table td{
+table th,
+table td{
     border:1px solid #ddd;
     padding:10px;
 }
 
 table th{
-    background:#007bff;
+    background:#0d6efd;
     color:white;
 }
 
@@ -136,32 +133,28 @@ img{
 </style>
 
 </head>
+
 <body>
 
 <div class="container">
 
-<h2>Data Siswa</h2>
+<h2>Input Data Siswa</h2>
 
 <form method="POST" enctype="multipart/form-data">
 
-<label>NIS</label>
-<input type="text" name="nis" required>
+    <input type="text" name="nis" placeholder="NIS" required>
 
-<label>Nama</label>
-<input type="text" name="nama" required>
+    <input type="text" name="nama" placeholder="Nama Siswa" required>
 
-<label>Kelas</label>
-<input type="text" name="kelas" required>
+    <input type="text" name="kelas" placeholder="Kelas" required>
 
-<label>Alamat</label>
-<textarea name="alamat"></textarea>
+    <textarea name="alamat" placeholder="Alamat"></textarea>
 
-<label>Foto</label>
-<input type="file" name="foto" required>
+    <input type="file" name="foto" required>
 
-<button type="submit" name="simpan">
-Simpan Data
-</button>
+    <button type="submit" name="simpan">
+        Simpan
+    </button>
 
 </form>
 
@@ -178,34 +171,43 @@ Simpan Data
     <th>Nama</th>
     <th>Kelas</th>
     <th>Alamat</th>
+    <th>URL Foto</th>
 </tr>
 
 <?php
 
-$data = mysqli_query($conn, "SELECT * FROM siswa ORDER BY id DESC");
+$query = mysqli_query($conn, "SELECT * FROM siswa ORDER BY id DESC");
 
-while($row = mysqli_fetch_assoc($data))
+while($row = mysqli_fetch_assoc($query))
 {
 ?>
 
 <tr>
 
-<td><?= $row['id']; ?></td>
+<td><?php echo $row['id']; ?></td>
 
 <td>
-<?php if($row['foto']) { ?>
-<img src="<?= $row['foto']; ?>" width="80">
+<?php if(!empty($row['foto'])) { ?>
+    <img src="<?php echo $row['foto']; ?>" width="100" height="100">
+<?php } else { ?>
+    Tidak ada foto
 <?php } ?>
 </td>
 
-<td><?= $row['nis']; ?></td>
-<td><?= $row['nama']; ?></td>
-<td><?= $row['kelas']; ?></td>
-<td><?= $row['alamat']; ?></td>
+<td><?php echo $row['nis']; ?></td>
+<td><?php echo $row['nama']; ?></td>
+<td><?php echo $row['kelas']; ?></td>
+<td><?php echo $row['alamat']; ?></td>
+
+<td>
+<?php echo $row['foto']; ?>
+</td>
 
 </tr>
 
-<?php } ?>
+<?php
+}
+?>
 
 </table>
 
