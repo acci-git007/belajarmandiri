@@ -1,14 +1,14 @@
 <?php
 
-require 'vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
 use Aws\S3\S3Client;
 
-/* ==========================
-   KONEKSI RDS
-========================== */
+/* =========================
+   KONFIGURASI RDS
+========================= */
 
-$host = "dbsiswa.c83ya4kmsi7u.us-east-1.rds.amazonaws.com";
+$host = "db-data-siswa.c83ya4kmsi7u.us-east-1.rds.amazonaws.com";
 $user = "admin";
 $pass = "admin2026";
 $db   = "dbsiswa";
@@ -16,23 +16,22 @@ $db   = "dbsiswa";
 $conn = mysqli_connect($host, $user, $pass, $db);
 
 if (!$conn) {
-    die("Koneksi database gagal : " . mysqli_connect_error());
+    die("Koneksi RDS gagal : " . mysqli_connect_error());
 }
 
-/* ==========================
-   KONEKSI S3
-========================== */
+/* =========================
+   KONFIGURASI S3
+========================= */
 
-$bucket = "foto-siswa-bucket";
-
+$bucket = "foto-data-siswa";
 $s3 = new S3Client([
     'version' => 'latest',
     'region'  => 'us-east-1'
 ]);
 
-/* ==========================
+/* =========================
    SIMPAN DATA
-========================== */
+========================= */
 
 if (isset($_POST['simpan'])) {
 
@@ -41,7 +40,7 @@ if (isset($_POST['simpan'])) {
     $kelas  = mysqli_real_escape_string($conn, $_POST['kelas']);
     $alamat = mysqli_real_escape_string($conn, $_POST['alamat']);
 
-    $fotoUrl = '';
+    $fotoUrl = "";
 
     if (!empty($_FILES['foto']['name'])) {
 
@@ -50,16 +49,17 @@ if (isset($_POST['simpan'])) {
         try {
 
             $upload = $s3->putObject([
-                'Bucket'     => $bucket,
-                'Key'        => 'siswa/' . $namaFile,
-                'SourceFile' => $_FILES['foto']['tmp_name']
+                'Bucket'      => $bucket,
+                'Key'         => 'siswa/' . $namaFile,
+                'SourceFile'  => $_FILES['foto']['tmp_name'],
+                'ContentType' => $_FILES['foto']['type']
             ]);
 
             $fotoUrl = $upload['ObjectURL'];
 
         } catch (Exception $e) {
 
-            die("Upload S3 gagal : " . $e->getMessage());
+            die("Upload ke S3 gagal : " . $e->getMessage());
         }
     }
 
@@ -80,13 +80,13 @@ if (isset($_POST['simpan'])) {
 <html>
 <head>
 <meta charset="utf-8">
-<title>Data Siswa AWS</title>
+<title>Aplikasi Data Siswa</title>
 
 <style>
 
 body{
-    font-family: Arial, sans-serif;
-    background:#f4f4f4;
+    font-family:Arial;
+    background:#f5f5f5;
     margin:30px;
 }
 
@@ -96,17 +96,17 @@ body{
     border-radius:10px;
 }
 
-input,textarea{
+input, textarea{
     width:100%;
     padding:10px;
     margin-bottom:10px;
 }
 
 button{
-    padding:10px 20px;
     background:#0d6efd;
     color:white;
     border:none;
+    padding:10px 20px;
 }
 
 table{
@@ -115,8 +115,7 @@ table{
     margin-top:20px;
 }
 
-table th,
-table td{
+table th, table td{
     border:1px solid #ddd;
     padding:10px;
 }
@@ -126,14 +125,8 @@ table th{
     color:white;
 }
 
-img{
-    border-radius:5px;
-}
-
 </style>
-
 </head>
-
 <body>
 
 <div class="container">
@@ -171,14 +164,13 @@ img{
     <th>Nama</th>
     <th>Kelas</th>
     <th>Alamat</th>
-    <th>URL Foto</th>
 </tr>
 
 <?php
 
-$query = mysqli_query($conn, "SELECT * FROM siswa ORDER BY id DESC");
+$data = mysqli_query($conn,"SELECT * FROM siswa ORDER BY id DESC");
 
-while($row = mysqli_fetch_assoc($query))
+while($row = mysqli_fetch_assoc($data))
 {
 ?>
 
@@ -187,21 +179,22 @@ while($row = mysqli_fetch_assoc($query))
 <td><?php echo $row['id']; ?></td>
 
 <td>
+
 <?php if(!empty($row['foto'])) { ?>
-    <img src="<?php echo $row['foto']; ?>" width="100" height="100">
-<?php } else { ?>
-    Tidak ada foto
+
+<img
+src="<?php echo $row['foto']; ?>"
+width="100"
+height="100">
+
 <?php } ?>
+
 </td>
 
 <td><?php echo $row['nis']; ?></td>
 <td><?php echo $row['nama']; ?></td>
 <td><?php echo $row['kelas']; ?></td>
 <td><?php echo $row['alamat']; ?></td>
-
-<td>
-<?php echo $row['foto']; ?>
-</td>
 
 </tr>
 
