@@ -1,77 +1,79 @@
 <?php
 
-require __DIR__ . '/vendor/autoload.php';
+require 'vendor/autoload.php';
 
 use Aws\S3\S3Client;
 
-/* =========================
-   KONFIGURASI RDS
-========================= */
-
-$host = "db-data-siswa.c83ya4kmsi7u.us-east-1.rds.amazonaws.com";
+$host = "database-skincare.xxxxx.us-east-1.rds.amazonaws.com";
 $user = "admin";
-$pass = "admin2026";
-$db   = "dbsiswa";
+$pass = "password123";
+$db   = "db_skincare";
 
-$conn = mysqli_connect($host, $user, $pass, $db);
+$conn = new mysqli($host,$user,$pass,$db);
 
-if (!$conn) {
-    die("Koneksi RDS gagal : " . mysqli_connect_error());
+if($conn->connect_error){
+    die("Koneksi gagal: ".$conn->connect_error);
 }
 
-/* =========================
-   KONFIGURASI S3
-========================= */
-
-$bucket = "foto-data-siswa";
 $s3 = new S3Client([
     'version' => 'latest',
-    'region'  => 'us-east-1'
+    'region'  => 'us-east-1',
+    'credentials' => [
+        'key'    => 'AKIAxxxxxxxx',
+        'secret' => 'xxxxxxxxxxxxxxxx'
+    ]
 ]);
 
-/* =========================
-   SIMPAN DATA
-========================= */
+$bucket = "bucket-skincare";
 
-if (isset($_POST['simpan'])) {
+if(isset($_POST['simpan'])){
 
-    $nis    = mysqli_real_escape_string($conn, $_POST['nis']);
-    $nama   = mysqli_real_escape_string($conn, $_POST['nama']);
-    $kelas  = mysqli_real_escape_string($conn, $_POST['kelas']);
-    $alamat = mysqli_real_escape_string($conn, $_POST['alamat']);
+    $nama_produk = $_POST['nama_produk'];
+    $merk = $_POST['merk'];
+    $kategori = $_POST['kategori'];
+    $harga = $_POST['harga'];
+    $stok = $_POST['stok'];
 
-    $fotoUrl = "";
+    $foto_url = '';
 
-    if (!empty($_FILES['foto']['name'])) {
+    if($_FILES['foto']['name'] != ''){
 
-        $namaFile = time() . "_" . basename($_FILES['foto']['name']);
+        $file_tmp = $_FILES['foto']['tmp_name'];
+        $file_name = time().'_'.$_FILES['foto']['name'];
 
-        try {
+        try{
 
             $upload = $s3->putObject([
-                'Bucket'      => $bucket,
-                'Key'         => 'siswa/' . $namaFile,
-                'SourceFile'  => $_FILES['foto']['tmp_name'],
-                'ContentType' => $_FILES['foto']['type']
+                'Bucket' => $bucket,
+                'Key'    => $file_name,
+                'SourceFile' => $file_tmp,
+                'ACL' => 'public-read'
             ]);
 
-            $fotoUrl = $upload['ObjectURL'];
+            $foto_url = $upload['ObjectURL'];
 
-        } catch (Exception $e) {
-
-            die("Upload ke S3 gagal : " . $e->getMessage());
+        }catch(Exception $e){
+            die("Upload gagal : ".$e->getMessage());
         }
     }
 
-    $sql = "INSERT INTO siswa
-            (nis,nama,kelas,alamat,foto)
+    $sql = "INSERT INTO penjualan_skincare
+            (nama_produk,merk,kategori,harga,stok,foto)
             VALUES
-            ('$nis','$nama','$kelas','$alamat','$fotoUrl')";
+            ('$nama_produk','$merk','$kategori','$harga','$stok','$foto_url')";
 
-    mysqli_query($conn, $sql);
+    $conn->query($sql);
 
     header("Location:index.php");
-    exit;
+}
+
+if(isset($_GET['hapus'])){
+
+    $id = $_GET['hapus'];
+
+    $conn->query("DELETE FROM penjualan_skincare WHERE id='$id'");
+
+    header("Location:index.php");
 }
 
 ?>
@@ -79,15 +81,14 @@ if (isset($_POST['simpan'])) {
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>Aplikasi Data Siswa</title>
+<title>Penjualan Skincare AWS</title>
 
 <style>
 
 body{
-    font-family:Arial;
+    font-family: Arial;
     background:#f5f5f5;
-    margin:30px;
+    padding:20px;
 }
 
 .container{
@@ -96,14 +97,14 @@ body{
     border-radius:10px;
 }
 
-input, textarea{
+input{
     width:100%;
     padding:10px;
     margin-bottom:10px;
 }
 
 button{
-    background:#0d6efd;
+    background:#ff69b4;
     color:white;
     border:none;
     padding:10px 20px;
@@ -111,96 +112,100 @@ button{
 
 table{
     width:100%;
-    border-collapse:collapse;
     margin-top:20px;
+    border-collapse:collapse;
 }
 
-table th, table td{
+table,th,td{
     border:1px solid #ddd;
+}
+
+th,td{
     padding:10px;
 }
 
-table th{
-    background:#0d6efd;
-    color:white;
+img{
+    width:100px;
 }
 
 </style>
+
 </head>
 <body>
 
 <div class="container">
 
-<h2>Input Data Siswa</h2>
+<h2>Penjualan Skincare</h2>
 
 <form method="POST" enctype="multipart/form-data">
 
-    <input type="text" name="nis" placeholder="NIS" required>
+<input type="text" name="nama_produk" placeholder="Nama Produk" required>
 
-    <input type="text" name="nama" placeholder="Nama Siswa" required>
+<input type="text" name="merk" placeholder="Merk" required>
 
-    <input type="text" name="kelas" placeholder="Kelas" required>
+<input type="text" name="kategori" placeholder="Kategori" required>
 
-    <textarea name="alamat" placeholder="Alamat"></textarea>
+<input type="number" name="harga" placeholder="Harga" required>
 
-    <input type="file" name="foto" required>
+<input type="number" name="stok" placeholder="Stok" required>
 
-    <button type="submit" name="simpan">
-        Simpan
-    </button>
+<input type="file" name="foto" required>
+
+<button type="submit" name="simpan">
+Simpan
+</button>
 
 </form>
-
-<hr>
-
-<h2>Daftar Siswa</h2>
 
 <table>
 
 <tr>
-    <th>ID</th>
-    <th>Foto</th>
-    <th>NIS</th>
-    <th>Nama</th>
-    <th>Kelas</th>
-    <th>Alamat</th>
+<th>ID</th>
+<th>Produk</th>
+<th>Merk</th>
+<th>Kategori</th>
+<th>Harga</th>
+<th>Stok</th>
+<th>Foto</th>
+<th>Aksi</th>
 </tr>
 
 <?php
 
-$data = mysqli_query($conn,"SELECT * FROM siswa ORDER BY id DESC");
+$data = $conn->query("SELECT * FROM penjualan_skincare");
 
-while($row = mysqli_fetch_assoc($data))
-{
+while($d = $data->fetch_assoc()){
+
 ?>
 
 <tr>
 
-<td><?php echo $row['id']; ?></td>
+<td><?= $d['id']; ?></td>
+
+<td><?= $d['nama_produk']; ?></td>
+
+<td><?= $d['merk']; ?></td>
+
+<td><?= $d['kategori']; ?></td>
+
+<td>Rp <?= number_format($d['harga']); ?></td>
+
+<td><?= $d['stok']; ?></td>
 
 <td>
-
-<?php if(!empty($row['foto'])) { ?>
-
-<img
-src="<?php echo $row['foto']; ?>"
-width="100"
-height="100">
-
-<?php } ?>
-
+<img src="<?= $d['foto']; ?>">
 </td>
 
-<td><?php echo $row['nis']; ?></td>
-<td><?php echo $row['nama']; ?></td>
-<td><?php echo $row['kelas']; ?></td>
-<td><?php echo $row['alamat']; ?></td>
+<td>
+<a href="?hapus=<?= $d['id']; ?>"
+onclick="return confirm('Hapus data?')">
+Hapus
+</a>
+</td>
 
 </tr>
 
-<?php
-}
-?>
+<?php } ?>
 
 </table>
 
