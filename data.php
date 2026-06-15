@@ -4,14 +4,14 @@ require __DIR__ . '/vendor/autoload.php';
 
 use Aws\S3\S3Client;
 
-/* ==================================
+/* ==========================
    KONFIGURASI RDS
-================================== */
+========================== */
 
-$host = "db-penjualan-skincare.c83ya4kmsi7u.us-east-1.rds.amazonaws.com";
-$user = "admin";
-$pass = "admin2026";
-$db   = "dbskincare";
+$host = "dbsiswa.c83ya4kmsi7u.us-east-1.rds.amazonaws.com";
+$user = "latihan";
+$pass = "latihan2026";
+$db   = "dbsiswa";
 
 $conn = mysqli_connect($host, $user, $pass, $db);
 
@@ -19,27 +19,27 @@ if (!$conn) {
     die("Koneksi RDS gagal: " . mysqli_connect_error());
 }
 
-/* ==================================
+/* ==========================
    KONFIGURASI S3
-================================== */
+========================== */
 
-$bucket = "penjualan-skincare-s3";
+$bucket = "data-siswa-foto";
 
 $s3 = new S3Client([
     'version' => 'latest',
     'region'  => 'us-east-1'
 ]);
 
-/* ==================================
+/* ==========================
    SIMPAN DATA
-================================== */
+========================== */
 
 if (isset($_POST['simpan'])) {
 
-    $nama     = mysqli_real_escape_string($conn, $_POST['nama_produk']);
-    $kategori = mysqli_real_escape_string($conn, $_POST['kategori']);
-    $harga    = mysqli_real_escape_string($conn, $_POST['harga']);
-    $stok     = mysqli_real_escape_string($conn, $_POST['stok']);
+    $nis    = mysqli_real_escape_string($conn, $_POST['nis']);
+    $nama   = mysqli_real_escape_string($conn, $_POST['nama']);
+    $kelas  = mysqli_real_escape_string($conn, $_POST['kelas']);
+    $alamat = mysqli_real_escape_string($conn, $_POST['alamat']);
 
     $fotoUrl = '';
 
@@ -51,7 +51,7 @@ if (isset($_POST['simpan'])) {
 
             $upload = $s3->putObject([
                 'Bucket'      => $bucket,
-                'Key'         => 'produk/' . $namaFile,
+                'Key'         => 'siswa/' . $namaFile,
                 'SourceFile'  => $_FILES['foto']['tmp_name'],
                 'ContentType' => $_FILES['foto']['type']
             ]);
@@ -60,50 +60,51 @@ if (isset($_POST['simpan'])) {
 
         } catch (Exception $e) {
 
-            die("Upload S3 gagal : " . $e->getMessage());
+            die("Upload S3 gagal: " . $e->getMessage());
         }
     }
 
-    $sql = "INSERT INTO produk
-            (nama_produk,kategori,harga,stok,foto)
+    $sql = "INSERT INTO siswa
+            (nis,nama,kelas,alamat,foto)
             VALUES
-            ('$nama','$kategori','$harga','$stok','$fotoUrl')";
+            ('$nis','$nama','$kelas','$alamat','$fotoUrl')";
 
     mysqli_query($conn, $sql);
 
     header("Location:index.php");
     exit;
 }
+
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Penjualan Skincare</title>
+<title>Data Siswa</title>
 
 <style>
 
 body{
     font-family:Arial;
     background:#f4f4f4;
-    margin:30px;
+    margin:20px;
 }
 
 .container{
-    background:#fff;
+    background:white;
     padding:20px;
     border-radius:10px;
 }
 
-input{
+input,textarea{
     width:100%;
     padding:10px;
     margin-bottom:10px;
 }
 
 button{
-    background:#28a745;
+    background:#007bff;
     color:white;
     border:none;
     padding:10px 20px;
@@ -122,74 +123,69 @@ table td{
 }
 
 table th{
-    background:#28a745;
+    background:#007bff;
     color:white;
 }
 
-img{
-    border-radius:5px;
-}
-
 </style>
-
 </head>
+
 <body>
 
 <div class="container">
 
-<h2>Input Produk Skincare</h2>
+<h2>Input Data Siswa</h2>
 
 <form method="POST" enctype="multipart/form-data">
 
 <input type="text"
-       name="nama_produk"
-       placeholder="Nama Produk"
+       name="nis"
+       placeholder="NIS"
        required>
 
 <input type="text"
-       name="kategori"
-       placeholder="Kategori (Serum, Toner, Moisturizer)"
+       name="nama"
+       placeholder="Nama Siswa"
        required>
 
-<input type="number"
-       name="harga"
-       placeholder="Harga"
+<input type="text"
+       name="kelas"
+       placeholder="Kelas"
        required>
 
-<input type="number"
-       name="stok"
-       placeholder="Stok"
-       required>
+<textarea name="alamat"
+          placeholder="Alamat"></textarea>
 
 <input type="file"
        name="foto"
        required>
 
-<button type="submit" name="simpan">
-Simpan Produk
+<button type="submit"
+        name="simpan">
+Simpan
 </button>
 
 </form>
 
 <hr>
 
-<h2>Daftar Produk</h2>
+<h2>Daftar Data Siswa</h2>
 
 <table>
 
 <tr>
     <th>ID</th>
     <th>Foto</th>
-    <th>Nama Produk</th>
-    <th>Kategori</th>
-    <th>Harga</th>
-    <th>Stok</th>
+    <th>NIS</th>
+    <th>Nama</th>
+    <th>Kelas</th>
+    <th>Alamat</th>
 </tr>
 
 <?php
 
 $data = mysqli_query($conn,
-        "SELECT * FROM produk ORDER BY id DESC");
+        "SELECT * FROM siswa ORDER BY id DESC");
 
 while($row = mysqli_fetch_assoc($data))
 {
@@ -197,13 +193,13 @@ while($row = mysqli_fetch_assoc($data))
 
 <tr>
 
-<td><?php echo $row['id']; ?></td>
+<td><?= $row['id']; ?></td>
 
 <td>
 
 <?php if(!empty($row['foto'])) { ?>
 
-<img src="<?php echo $row['foto']; ?>"
+<img src="<?= $row['foto']; ?>"
      width="100"
      height="100">
 
@@ -211,16 +207,14 @@ while($row = mysqli_fetch_assoc($data))
 
 </td>
 
-<td><?php echo $row['nama_produk']; ?></td>
-<td><?php echo $row['kategori']; ?></td>
-<td>Rp <?php echo number_format($row['harga']); ?></td>
-<td><?php echo $row['stok']; ?></td>
+<td><?= $row['nis']; ?></td>
+<td><?= $row['nama']; ?></td>
+<td><?= $row['kelas']; ?></td>
+<td><?= $row['alamat']; ?></td>
 
 </tr>
 
-<?php
-}
-?>
+<?php } ?>
 
 </table>
 
