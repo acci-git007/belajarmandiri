@@ -81,3 +81,44 @@ policy ke s3 bucket
 
 
 
+
+
+
+
+
+                 INTERNET
+                      │
+
+        ┌─────────────┴─────────────┐
+        │                           │
+
+        ▼                           ▼
+
+  ALB-PENDAFTAR                ALB-ALUMNI
+        │                           │
+        ▼                           ▼
+
+  TG-PENDAFTAR                 TG-ALUMNI
+        │                           │
+
+   ┌────┴────┐                 ┌────┴────┐
+   │         │                 │         │
+
+ EC2-1    EC2-2             EC2-3    EC2-4
+
+        └─────────┬─────────┘
+                  │
+                  ▼
+
+             RDS MySQL
+       ┌─────────────────┐
+       │ dbpendaftar     │
+       │ dbalumni        │
+       └─────────────────┘
+
+                  │
+                  ▼
+
+                S3
+
+
