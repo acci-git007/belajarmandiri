@@ -1,12 +1,13 @@
 <?php
+
 require 'vendor/autoload.php';
 
 use Aws\S3\S3Client;
 
-$host = "dblatihanlks2026.cs16kc6eazau.us-east-1.rds.amazonaws.com";
-$user = "admin";
-$pass = "admin2026";
-$db   = "dbpendaftar";
+$host   = "dblatihanlks2026.cs16kc6eazau.us-east-1.rds.amazonaws.com";
+$user   = "admin";
+$pass   = "admin2026";
+$db     = "dbpendaftar";
 
 $bucket = "traininglks2026";
 $region = "us-east-1";
@@ -14,7 +15,7 @@ $region = "us-east-1";
 $conn = mysqli_connect($host,$user,$pass,$db);
 
 if(!$conn){
-    die("Koneksi RDS gagal");
+    die("Koneksi RDS gagal : ".mysqli_connect_error());
 }
 
 $s3 = new S3Client([
@@ -24,24 +25,31 @@ $s3 = new S3Client([
 
 if(isset($_POST['simpan'])){
 
-    $nomor_formulir = $_POST['nomor_formulir'];
-    $nisn           = $_POST['nisn'];
-    $nama           = $_POST['nama'];
-    $asal_sekolah   = $_POST['asal_sekolah'];
+    $nomor_formulir = mysqli_real_escape_string($conn,$_POST['nomor_formulir']);
+    $nisn           = mysqli_real_escape_string($conn,$_POST['nisn']);
+    $nama           = mysqli_real_escape_string($conn,$_POST['nama']);
+    $asal_sekolah   = mysqli_real_escape_string($conn,$_POST['asal_sekolah']);
 
     $fotoUrl = "";
 
-    if(!empty($_FILES['foto']['name'])){
+    if(isset($_FILES['foto']) && $_FILES['foto']['error']==0){
 
-        $namaFile = "pendaftar/" . time() . "_" . basename($_FILES['foto']['name']);
+        try{
 
-        $upload = $s3->putObject([
-            'Bucket'     => $traininglks2026t,
-            'Key'        => $pendaftaran,
-            'SourceFile' => $_FILES['foto']['tmp_name']
-        ]);
+            $namaFile = "pendaftar/".time()."_".basename($_FILES['foto']['name']);
 
-        $fotoUrl = $upload['ObjectURL'];
+            $s3->putObject([
+                'Bucket'     => $bucket,
+                'Key'        => $namaFile,
+                'SourceFile' => $_FILES['foto']['tmp_name']
+            ]);
+
+            $fotoUrl = "https://".$bucket.".s3.".$region.".amazonaws.com/".$namaFile;
+
+        }catch(Exception $e){
+
+            die("Upload S3 gagal : ".$e->getMessage());
+        }
     }
 
     mysqli_query($conn,"
@@ -54,19 +62,20 @@ if(isset($_POST['simpan'])){
 
 if(isset($_GET['hapus'])){
 
-    $id = $_GET['hapus'];
+    $id = (int)$_GET['hapus'];
 
     mysqli_query($conn,"
     DELETE FROM tbpendaftar
     WHERE id='$id'
     ");
 }
+
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
-
+<meta charset="utf-8">
 <title>Pendaftaran Siswa Baru</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -81,7 +90,7 @@ if(isset($_GET['hapus'])){
 <div class="card">
 <div class="card-body">
 
-<form method="POST" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data">
 
 <div class="mb-3">
 <label>Nomor Formulir</label>
@@ -119,28 +128,31 @@ Simpan
 
 <hr>
 
-<h4>Data Pendaftar</h4>
+<table class="table table-bordered table-striped">
 
-<table class="table table-bordered">
-
+<thead>
 <tr>
 <th>ID</th>
-<th>Nomor Formulir</th>
+<th>No Formulir</th>
 <th>NISN</th>
 <th>Nama</th>
 <th>Asal Sekolah</th>
 <th>Foto</th>
 <th>Aksi</th>
 </tr>
+</thead>
+
+<tbody>
 
 <?php
 
 $data = mysqli_query($conn,"
-SELECT * FROM tbpendaftar
+SELECT *
+FROM tbpendaftar
 ORDER BY id DESC
 ");
 
-while($d = mysqli_fetch_assoc($data)){
+while($d=mysqli_fetch_assoc($data)){
 ?>
 
 <tr>
@@ -152,21 +164,30 @@ while($d = mysqli_fetch_assoc($data)){
 <td><?= $d['asal_sekolah']; ?></td>
 
 <td>
-<img src="<?= $d['foto']; ?>"
-width="100">
+
+<?php if(!empty($d['foto'])){ ?>
+
+<img src="<?= $d['foto']; ?>" width="100">
+
+<?php } ?>
+
 </td>
 
 <td>
+
 <a href="?hapus=<?= $d['id']; ?>"
 class="btn btn-danger btn-sm"
 onclick="return confirm('Hapus data?')">
 Hapus
 </a>
+
 </td>
 
 </tr>
 
 <?php } ?>
+
+</tbody>
 
 </table>
 
