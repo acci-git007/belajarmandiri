@@ -3,45 +3,47 @@ require 'vendor/autoload.php';
 
 use Aws\S3\S3Client;
 
-$host = "dblatihanlks2026.cs16kc6eazau.us-east-1.rds.amazonaws.com";
-$user = "admin";
-$pass = "admin2026";
-$db   = "dbalumni";
+$host   = "RDS-ENDPOINT";
+$user   = "admin";
+$pass   = "PASSWORD";
+$db     = "dbalumni";
 
-$bucket = "latihanlks2026";
+$bucket = "traininglks2026";
 $region = "us-east-1";
 
 $conn = mysqli_connect($host,$user,$pass,$db);
 
-if(!$conn){
-    die("Koneksi RDS gagal");
-}
-
 $s3 = new S3Client([
     'version' => 'latest',
-    'region'  => $region
+    'region' => $region
 ]);
 
 if(isset($_POST['simpan'])){
 
-    $nisn         = $_POST['nisn'];
-    $nama         = $_POST['nama'];
-    $jurusan      = $_POST['jurusan'];
-    $tahun_lulus  = $_POST['tahun_lulus'];
+    $nisn = $_POST['nisn'];
+    $nama = $_POST['nama'];
+    $jurusan = $_POST['jurusan'];
+    $tahun_lulus = $_POST['tahun_lulus'];
 
     $fotoUrl = "";
 
-    if(!empty($_FILES['foto']['name'])){
+    if($_FILES['foto']['error']==0){
 
-        $namaFile = "alumni/" . time() . "_" . basename($_FILES['foto']['name']);
+        $namaAsli = preg_replace(
+            '/[^A-Za-z0-9.\-_]/',
+            '_',
+            $_FILES['foto']['name']
+        );
 
-        $upload = $s3->putObject([
-            'Bucket'     => $latihanlks2026,
-            'Key'        => $alumni,
+        $key = "alumni/".time()."_".$namaAsli;
+
+        $result = $s3->putObject([
+            'Bucket' => $bucket,
+            'Key' => $key,
             'SourceFile' => $_FILES['foto']['tmp_name']
         ]);
 
-        $fotoUrl = $upload['ObjectURL'];
+        $fotoUrl = $result['ObjectURL'];
     }
 
     mysqli_query($conn,"
@@ -51,62 +53,32 @@ if(isset($_POST['simpan'])){
     ('$nisn','$nama','$jurusan','$tahun_lulus','$fotoUrl')
     ");
 }
-
-if(isset($_GET['hapus'])){
-
-    $id = $_GET['hapus'];
-
-    mysqli_query($conn,"
-    DELETE FROM tbalumni
-    WHERE id='$id'
-    ");
-}
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
-
 <title>Data Alumni</title>
-
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
 </head>
+
 <body>
 
 <div class="container mt-4">
 
-<h2 class="mb-4">Data Alumni</h2>
+<h2>Data Alumni</h2>
 
-<div class="card">
-<div class="card-body">
+<form method="post" enctype="multipart/form-data">
 
-<form method="POST" enctype="multipart/form-data">
+<input type="text" name="nisn" class="form-control mb-2" placeholder="NISN" required>
 
-<div class="mb-3">
-<label>NISN</label>
-<input type="text" name="nisn" class="form-control" required>
-</div>
+<input type="text" name="nama" class="form-control mb-2" placeholder="Nama" required>
 
-<div class="mb-3">
-<label>Nama</label>
-<input type="text" name="nama" class="form-control" required>
-</div>
+<input type="text" name="jurusan" class="form-control mb-2" placeholder="Jurusan" required>
 
-<div class="mb-3">
-<label>Jurusan</label>
-<input type="text" name="jurusan" class="form-control" required>
-</div>
+<input type="number" name="tahun_lulus" class="form-control mb-2" placeholder="Tahun Lulus" required>
 
-<div class="mb-3">
-<label>Tahun Lulus</label>
-<input type="number" name="tahun_lulus" class="form-control" required>
-</div>
-
-<div class="mb-3">
-<label>Foto</label>
-<input type="file" name="foto" class="form-control" required>
-</div>
+<input type="file" name="foto" class="form-control mb-2" required>
 
 <button type="submit" name="simpan" class="btn btn-primary">
 Simpan
@@ -114,12 +86,7 @@ Simpan
 
 </form>
 
-</div>
-</div>
-
 <hr>
-
-<h4>Data Alumni</h4>
 
 <table class="table table-bordered">
 
@@ -130,17 +97,16 @@ Simpan
 <th>Jurusan</th>
 <th>Tahun Lulus</th>
 <th>Foto</th>
-<th>Aksi</th>
 </tr>
 
 <?php
 
-$data = mysqli_query($conn,"
+$data=mysqli_query($conn,"
 SELECT * FROM tbalumni
 ORDER BY id DESC
 ");
 
-while($d = mysqli_fetch_assoc($data)){
+while($d=mysqli_fetch_assoc($data)){
 ?>
 
 <tr>
@@ -152,15 +118,9 @@ while($d = mysqli_fetch_assoc($data)){
 <td><?= $d['tahun_lulus']; ?></td>
 
 <td>
-<img src="<?= $d['foto']; ?>" width="100">
-</td>
-
-<td>
-<a href="?hapus=<?= $d['id']; ?>"
-class="btn btn-danger btn-sm"
-onclick="return confirm('Hapus data?')">
-Hapus
-</a>
+<?php if(!empty($d['foto'])){ ?>
+<img src="<?= htmlspecialchars($d['foto']); ?>" width="120">
+<?php } ?>
 </td>
 
 </tr>
