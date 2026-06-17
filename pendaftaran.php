@@ -1,55 +1,52 @@
 <?php
-
 require 'vendor/autoload.php';
 
 use Aws\S3\S3Client;
 
-$host   = "dblatihanlks2026.cs16kc6eazau.us-east-1.rds.amazonaws.com";
+$host   = "RDS-ENDPOINT";
 $user   = "admin";
-$pass   = "admin2026";
+$pass   = "PASSWORD";
 $db     = "dbpendaftar";
 
 $bucket = "traininglks2026";
 $region = "us-east-1";
 
 $conn = mysqli_connect($host,$user,$pass,$db);
-
 if(!$conn){
-    die("Koneksi RDS gagal : ".mysqli_connect_error());
+    die("Koneksi RDS gagal");
 }
 
 $s3 = new S3Client([
     'version' => 'latest',
-    'region'  => $region
+    'region' => $region
 ]);
 
 if(isset($_POST['simpan'])){
 
-    $nomor_formulir = mysqli_real_escape_string($conn,$_POST['nomor_formulir']);
-    $nisn           = mysqli_real_escape_string($conn,$_POST['nisn']);
-    $nama           = mysqli_real_escape_string($conn,$_POST['nama']);
-    $asal_sekolah   = mysqli_real_escape_string($conn,$_POST['asal_sekolah']);
+    $nomor_formulir = $_POST['nomor_formulir'];
+    $nisn = $_POST['nisn'];
+    $nama = $_POST['nama'];
+    $asal_sekolah = $_POST['asal_sekolah'];
 
     $fotoUrl = "";
 
-    if(isset($_FILES['foto']) && $_FILES['foto']['error']==0){
+    if($_FILES['foto']['error']==0){
 
-        try{
+        $namaAsli = preg_replace(
+            '/[^A-Za-z0-9.\-_]/',
+            '_',
+            $_FILES['foto']['name']
+        );
 
-            $namaFile = "pendaftar/".time()."_".basename($_FILES['foto']['name']);
+        $key = "pendaftar/".time()."_".$namaAsli;
 
-            $s3->putObject([
-                'Bucket'     => $bucket,
-                'Key'        => $namaFile,
-                'SourceFile' => $_FILES['foto']['tmp_name']
-            ]);
+        $result = $s3->putObject([
+            'Bucket' => $bucket,
+            'Key' => $key,
+            'SourceFile' => $_FILES['foto']['tmp_name']
+        ]);
 
-            $fotoUrl = "https://".$bucket.".s3.".$region.".amazonaws.com/".$namaFile;
-
-        }catch(Exception $e){
-
-            die("Upload S3 gagal : ".$e->getMessage());
-        }
+        $fotoUrl = $result['ObjectURL'];
     }
 
     mysqli_query($conn,"
@@ -59,63 +56,32 @@ if(isset($_POST['simpan'])){
     ('$nomor_formulir','$nisn','$nama','$asal_sekolah','$fotoUrl')
     ");
 }
-
-if(isset($_GET['hapus'])){
-
-    $id = (int)$_GET['hapus'];
-
-    mysqli_query($conn,"
-    DELETE FROM tbpendaftar
-    WHERE id='$id'
-    ");
-}
-
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
 <title>Pendaftaran Siswa Baru</title>
-
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
 </head>
+
 <body>
 
 <div class="container mt-4">
 
-<h2 class="mb-4">Pendaftaran Siswa Baru</h2>
-
-<div class="card">
-<div class="card-body">
+<h2>Pendaftaran Siswa Baru</h2>
 
 <form method="post" enctype="multipart/form-data">
 
-<div class="mb-3">
-<label>Nomor Formulir</label>
-<input type="text" name="nomor_formulir" class="form-control" required>
-</div>
+<input type="text" name="nomor_formulir" class="form-control mb-2" placeholder="Nomor Formulir" required>
 
-<div class="mb-3">
-<label>NISN</label>
-<input type="text" name="nisn" class="form-control" required>
-</div>
+<input type="text" name="nisn" class="form-control mb-2" placeholder="NISN" required>
 
-<div class="mb-3">
-<label>Nama</label>
-<input type="text" name="nama" class="form-control" required>
-</div>
+<input type="text" name="nama" class="form-control mb-2" placeholder="Nama" required>
 
-<div class="mb-3">
-<label>Asal Sekolah</label>
-<input type="text" name="asal_sekolah" class="form-control" required>
-</div>
+<input type="text" name="asal_sekolah" class="form-control mb-2" placeholder="Asal Sekolah" required>
 
-<div class="mb-3">
-<label>Foto</label>
-<input type="file" name="foto" class="form-control" required>
-</div>
+<input type="file" name="foto" class="form-control mb-2" required>
 
 <button type="submit" name="simpan" class="btn btn-primary">
 Simpan
@@ -123,14 +89,10 @@ Simpan
 
 </form>
 
-</div>
-</div>
-
 <hr>
 
-<table class="table table-bordered table-striped">
+<table class="table table-bordered">
 
-<thead>
 <tr>
 <th>ID</th>
 <th>No Formulir</th>
@@ -138,17 +100,12 @@ Simpan
 <th>Nama</th>
 <th>Asal Sekolah</th>
 <th>Foto</th>
-<th>Aksi</th>
 </tr>
-</thead>
-
-<tbody>
 
 <?php
 
-$data = mysqli_query($conn,"
-SELECT *
-FROM tbpendaftar
+$data=mysqli_query($conn,"
+SELECT * FROM tbpendaftar
 ORDER BY id DESC
 ");
 
@@ -164,30 +121,14 @@ while($d=mysqli_fetch_assoc($data)){
 <td><?= $d['asal_sekolah']; ?></td>
 
 <td>
-
 <?php if(!empty($d['foto'])){ ?>
-
-<img src="<?= $d['foto']; ?>" width="100">
-
+<img src="<?= htmlspecialchars($d['foto']); ?>" width="120">
 <?php } ?>
-
-</td>
-
-<td>
-
-<a href="?hapus=<?= $d['id']; ?>"
-class="btn btn-danger btn-sm"
-onclick="return confirm('Hapus data?')">
-Hapus
-</a>
-
 </td>
 
 </tr>
 
 <?php } ?>
-
-</tbody>
 
 </table>
 
